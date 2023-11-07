@@ -15,15 +15,18 @@ const init = () => {
   });
 
   let sql =
-    'CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY, videoUrl TEXT, owner TEXT, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP)';
+    'CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY, videoUrl TEXT, owner TEXT, users TEXT, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP)';
 
   db.run(sql, (err) => {
     if (err) {
       console.error(err.message);
+      return;
     }
     console.log('Created rooms table.');
   });
 };
+
+init();
 
 export const createRoom = ({
   videoUrl,
@@ -47,9 +50,11 @@ export const createRoom = ({
         id = uid(16);
       }
 
-      sql = 'INSERT INTO rooms(id, videoUrl, owner) VALUES(?, ?, ?)';
+      sql = 'INSERT INTO rooms(id, videoUrl, owner, users) VALUES(?, ?, ?, ?)';
 
-      db.run(sql, [id, videoUrl, owner], (err) => {
+      const users = JSON.stringify([]);
+
+      db.run(sql, [id, videoUrl, owner, users], (err) => {
         if (err) {
           console.error(err.message);
           reject(err);
@@ -59,6 +64,7 @@ export const createRoom = ({
         console.log(
           `Created room with id ${id}, videoUrl ${videoUrl}, owner ${owner}.`,
         );
+
         resolve(id);
       });
     });
@@ -81,4 +87,80 @@ export const getRoom = (id: string): Promise<Room> => {
   });
 };
 
-init();
+export const addUserToRoom = ({
+  id,
+  user,
+}: {
+  id: string;
+  user: string;
+}): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const sql = 'SELECT users FROM rooms WHERE id = ?';
+
+    db.get(sql, [id], (err, row: Room) => {
+      if (err) {
+        console.error(err.message);
+        reject(err);
+        return;
+      }
+
+      const users = JSON.parse(row.users);
+
+      users.push(user);
+
+      const updatedUsers = JSON.stringify(users);
+
+      const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
+
+      db.run(sql, [updatedUsers, id], (err) => {
+        if (err) {
+          console.error(err.message);
+          reject(err);
+          return;
+        }
+
+        console.log(`Added user ${user} to room ${id}.`);
+
+        resolve();
+      });
+    });
+  });
+};
+
+export const removeUserFromRoom = ({
+  id,
+  user,
+}: {
+  id: string;
+  user: string;
+}): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const sql = 'SELECT users FROM rooms WHERE id = ?';
+
+    db.get(sql, [id], (err, row: Room) => {
+      if (err) {
+        console.error(err.message);
+        reject(err);
+        return;
+      }
+
+      const users = JSON.parse(row.users);
+
+      const updatedUsers = users.filter((u: string) => u !== user);
+
+      const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
+
+      db.run(sql, [JSON.stringify(updatedUsers), id], (err) => {
+        if (err) {
+          console.error(err.message);
+          reject(err);
+          return;
+        }
+
+        console.log(`Removed user ${user} from room ${id}.`);
+
+        resolve();
+      });
+    });
+  });
+};

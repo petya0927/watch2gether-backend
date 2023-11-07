@@ -20,10 +20,10 @@ router.post('/new', async (req, res) => {
   const videoUrl = req.body.videoUrl;
   const owner = req.body.owner;
 
-  const roomId = await createRoom({ videoUrl, owner });
+  const id = await createRoom({ videoUrl, owner });
 
-  if (roomId) {
-    res.status(200).send({ roomId });
+  if (id) {
+    res.status(200).send({ id });
     return;
   }
 
