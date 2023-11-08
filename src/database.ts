@@ -1,11 +1,19 @@
 import sqlite3 from 'sqlite3';
 import { uid } from 'uid';
 import { Room } from './types.js';
+import fs from 'fs';
 
 let db: sqlite3.Database;
 
 const init = () => {
-  db = new sqlite3.Database('./database.db', sqlite3.OPEN_READWRITE, (err) => {
+  const dbPath = './database.db';
+
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, '');
+    console.log('Created database file.');
+  }
+
+  db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE, (err) => {
     if (err) {
       console.error(err.message);
       return;
