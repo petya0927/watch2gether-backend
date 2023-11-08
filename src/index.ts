@@ -3,7 +3,12 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import roomRouter from './room.js';
-import { addUserToRoom, removeUserFromRoom } from './database.js';
+import {
+  addUserToRoom,
+  getRoom,
+  isUserInRoom,
+  removeUserFromRoom,
+} from './database.js';
 
 const port = 8081 || process.env.PORT;
 
@@ -21,25 +26,50 @@ app.use(cors());
 
 app.use('/room', roomRouter);
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   const query = socket.handshake.query;
 
-  console.log(`User connected: ${socket.id}, ${query.id}, ${query.username}`);
+  console.log(
+    `User ${query.username} connected to room ${query.id} with socket id ${socket.id}`,
+  );
 
-  addUserToRoom({
-    id: query.id as string,
-    user: query.username as string,
+  try {
+    if (
+      !(await isUserInRoom({
+        id: query.id as string,
+        user: query.username as string,
+      }))
+    ) {
+      await addUserToRoom({
+        id: query.id as string,
+        user: query.username as string,
+      });
+    }
+  } catch (error) {
+    console.error(`Failed to add user to room: ${error}`);
+    socket.disconnect();
+    return;
+  }
+
+  socket.emit('room-data', {
+    room: await getRoom(query.id as string),
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     console.log(
-      `User disconnected: ${socket.id}, ${query.id}, ${query.username}`,
+      `User ${query.username} disconnected from room ${query.id} with socket id ${socket.id}`,
     );
 
-    removeUserFromRoom({
-      id: query.id as string,
-      user: query.username as string,
-    });
+    try {
+      await removeUserFromRoom({
+        id: query.id as string,
+        user: query.username as string,
+      });
+    } catch (error) {
+      console.error(`Failed to remove user from room: ${error}`);
+      socket.disconnect();
+      return;
+    }
   });
 });
 

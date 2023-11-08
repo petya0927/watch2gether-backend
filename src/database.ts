@@ -42,39 +42,26 @@ export const createRoom = ({
 }: {
   videoUrl: string;
   owner: string;
-}): Promise<string> => {
+}): Promise<string | Error> => {
   return new Promise((resolve, reject) => {
     let id = uid(16);
-    let sql = 'SELECT id FROM rooms WHERE id = ?';
+    let sql =
+      'INSERT INTO rooms(id, videoUrl, owner, users) VALUES(?, ?, ?, ?)';
 
-    db.get(sql, [id], (err, row) => {
+    const users = JSON.stringify([owner]);
+
+    db.run(sql, [id, videoUrl, owner, users], (err) => {
       if (err) {
         console.error(err.message);
         reject(err);
         return;
       }
 
-      if (row) {
-        id = uid(16);
-      }
+      console.log(
+        `Created room with id ${id}, videoUrl ${videoUrl}, owner ${owner}.`,
+      );
 
-      sql = 'INSERT INTO rooms(id, videoUrl, owner, users) VALUES(?, ?, ?, ?)';
-
-      const users = JSON.stringify([]);
-
-      db.run(sql, [id, videoUrl, owner, users], (err) => {
-        if (err) {
-          console.error(err.message);
-          reject(err);
-          return;
-        }
-
-        console.log(
-          `Created room with id ${id}, videoUrl ${videoUrl}, owner ${owner}.`,
-        );
-
-        resolve(id);
-      });
+      resolve(id);
     });
   });
 };
@@ -91,6 +78,30 @@ export const getRoom = (id: string): Promise<Room> => {
       }
 
       resolve(row);
+    });
+  });
+};
+
+export const isUserInRoom = ({
+  id,
+  user,
+}: {
+  id: string;
+  user: string;
+}): Promise<boolean> => {
+  return new Promise<boolean>((resolve, reject) => {
+    const sql = 'SELECT users FROM rooms WHERE id = ?';
+
+    db.get(sql, [id], (err, row: Room) => {
+      if (err) {
+        console.error(err.message);
+        reject(err);
+        return undefined;
+      }
+
+      const users = JSON.parse(row.users);
+
+      resolve(users.includes(user));
     });
   });
 };
