@@ -1,7 +1,7 @@
+import fs from 'fs';
 import sqlite3 from 'sqlite3';
 import { uid } from 'uid';
-import { Room } from './types.js';
-import fs from 'fs';
+import { Room, RoomDatabase, User } from './types.js';
 
 let db: sqlite3.Database;
 
@@ -48,7 +48,7 @@ export const createRoom = ({
     let sql =
       'INSERT INTO rooms(id, videoUrl, owner, users) VALUES(?, ?, ?, ?)';
 
-    const users = JSON.stringify([owner]);
+    const users = JSON.stringify([]);
 
     db.run(sql, [id, videoUrl, owner, users], (err) => {
       if (err) {
@@ -70,60 +70,72 @@ export const getRoom = (id: string): Promise<Room> => {
   return new Promise((resolve, reject) => {
     const sql = 'SELECT * FROM rooms WHERE id = ?';
 
-    db.get(sql, [id], (err, row: Room) => {
+    db.get(sql, [id], (err, row: RoomDatabase) => {
       if (err) {
         console.error(err.message);
         reject(err);
         return;
       }
 
-      resolve(row);
+      const users: User[] = JSON.parse(row.users);
+
+      resolve({
+        ...row,
+        users,
+      });
     });
   });
 };
 
 export const isUserInRoom = ({
-  id,
+  roomId,
   user,
 }: {
-  id: string;
-  user: string;
+  roomId: string;
+  user: User;
 }): Promise<boolean> => {
   return new Promise<boolean>((resolve, reject) => {
     const sql = 'SELECT users FROM rooms WHERE id = ?';
 
-    db.get(sql, [id], (err, row: Room) => {
+    db.get(sql, [roomId], (err, row: RoomDatabase) => {
       if (err) {
         console.error(err.message);
         reject(err);
         return undefined;
       }
 
-      const users = JSON.parse(row.users);
+      const users: User[] = JSON.parse(row.users);
+      const foundUser: User | undefined = users.find(
+        (u: User) => u.username === user.username,
+      );
 
-      resolve(users.includes(user));
+      if (foundUser !== undefined) {
+        console.log(`User ${foundUser.username} is already in room ${roomId}.`);
+      }
+
+      resolve(foundUser !== undefined);
     });
   });
 };
 
 export const addUserToRoom = ({
-  id,
+  roomId,
   user,
 }: {
-  id: string;
-  user: string;
+  roomId: string;
+  user: User;
 }): Promise<void> => {
   return new Promise((resolve, reject) => {
     const sql = 'SELECT users FROM rooms WHERE id = ?';
 
-    db.get(sql, [id], (err, row: Room) => {
+    db.get(sql, [roomId], (err, row: RoomDatabase) => {
       if (err) {
         console.error(err.message);
         reject(err);
         return;
       }
 
-      const users = JSON.parse(row.users);
+      const users: User[] = JSON.parse(row.users);
 
       users.push(user);
 
@@ -131,14 +143,14 @@ export const addUserToRoom = ({
 
       const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
 
-      db.run(sql, [updatedUsers, id], (err) => {
+      db.run(sql, [updatedUsers, roomId], (err) => {
         if (err) {
           console.error(err.message);
           reject(err);
           return;
         }
 
-        console.log(`Added user ${user} to room ${id}.`);
+        console.log(`Added user ${user.username} to room ${roomId}.`);
 
         resolve();
       });
@@ -147,16 +159,16 @@ export const addUserToRoom = ({
 };
 
 export const removeUserFromRoom = ({
-  id,
+  roomId,
   user,
 }: {
-  id: string;
-  user: string;
+  roomId: string;
+  user: User;
 }): Promise<void> => {
   return new Promise((resolve, reject) => {
     const sql = 'SELECT users FROM rooms WHERE id = ?';
 
-    db.get(sql, [id], (err, row: Room) => {
+    db.get(sql, [roomId], (err, row: RoomDatabase) => {
       if (err) {
         console.error(err.message);
         reject(err);
@@ -165,18 +177,20 @@ export const removeUserFromRoom = ({
 
       const users = JSON.parse(row.users);
 
-      const updatedUsers = users.filter((u: string) => u !== user);
+      const updatedUsers = users.filter(
+        (u: User) => u.socketId !== user.socketId,
+      );
 
       const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
 
-      db.run(sql, [JSON.stringify(updatedUsers), id], (err) => {
+      db.run(sql, [JSON.stringify(updatedUsers), roomId], (err) => {
         if (err) {
           console.error(err.message);
           reject(err);
           return;
         }
 
-        console.log(`Removed user ${user} from room ${id}.`);
+        console.log(`Removed user ${user.username} from room ${roomId}.`);
 
         resolve();
       });
