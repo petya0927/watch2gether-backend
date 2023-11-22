@@ -6,7 +6,7 @@ import { Room, RoomDatabase, User } from './types.js';
 let db: sqlite3.Database;
 
 const init = () => {
-  const dbPath = './database.db';
+  const dbPath = './database/database.db';
 
   if (!fs.existsSync(dbPath)) {
     fs.writeFileSync(dbPath, '');
