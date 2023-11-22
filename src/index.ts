@@ -5,6 +5,7 @@ import roomRouter from './room.js';
 import {
   emitRoomData,
   emitUserJoined,
+  emitUserLeft,
   handleConnection,
   handleDisconnect,
   initSocket,
@@ -30,6 +31,7 @@ io.on('connection', async (socket) => {
   emitUserJoined(socket);
 
   socket.on('disconnect', async () => {
+    emitUserLeft(socket);
     await handleDisconnect(socket);
   });
 });

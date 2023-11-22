@@ -77,6 +77,12 @@ export const getRoom = (id: string): Promise<Room> => {
         return;
       }
 
+      if (!row) {
+        console.error(`Room ${id} not found.`);
+        reject(err);
+        return;
+      }
+
       const users: User[] = JSON.parse(row.users);
 
       resolve({
