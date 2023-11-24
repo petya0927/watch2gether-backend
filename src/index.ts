@@ -6,6 +6,8 @@ import {
   emitRoomData,
   emitUserJoined,
   emitUserLeft,
+  emitVideoPause,
+  emitVideoPlay,
   handleConnection,
   handleDisconnect,
   initSocket,
@@ -29,6 +31,14 @@ io.on('connection', async (socket) => {
   emitRoomData(socket);
 
   emitUserJoined(socket);
+
+  socket.on('video-play', (data) => {
+    emitVideoPlay({ socket, data });
+  });
+
+  socket.on('video-pause', () => {
+    emitVideoPause({ socket });
+  });
 
   socket.on('disconnect', async () => {
     emitUserLeft(socket);

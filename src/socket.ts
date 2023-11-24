@@ -110,3 +110,19 @@ export const handleDisconnect = async (socket: Socket) => {
     return;
   }
 };
+
+export const emitVideoPlay = ({
+  socket,
+  data,
+}: {
+  socket: Socket;
+  data: { played: number };
+}) => {
+  const query = socket.handshake.query;
+  socket.to(query.id as string).emit('video-play', data);
+};
+
+export const emitVideoPause = ({ socket }: { socket: Socket }) => {
+  const query = socket.handshake.query;
+  socket.to(query.id as string).emit('video-pause');
+};
