@@ -126,3 +126,14 @@ export const emitVideoPause = ({ socket }: { socket: Socket }) => {
   const query = socket.handshake.query;
   socket.to(query.id as string).emit('video-pause');
 };
+
+export const emitVideoPlaybackRateChange = ({
+  socket,
+  data,
+}: {
+  socket: Socket;
+  data: { playbackRate: number };
+}) => {
+  const query = socket.handshake.query;
+  socket.to(query.id as string).emit('video-playback-rate-change', data);
+};
