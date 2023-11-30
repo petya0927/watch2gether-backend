@@ -2,7 +2,7 @@ import { Server, Socket } from 'socket.io';
 import {
   addUserToRoom,
   getRoom,
-  isUserInRoom,
+  isUsernameTaken,
   removeUserFromRoom,
 } from './database.js';
 
@@ -23,12 +23,9 @@ export const handleConnection = async (socket: Socket) => {
 
   try {
     if (
-      !(await isUserInRoom({
+      !(await isUsernameTaken({
         roomId: query.id as string,
-        user: {
-          socketId: socket.id,
-          username: query.username as string,
-        },
+        username: query.username as string,
       }))
     ) {
       console.log(
@@ -47,7 +44,7 @@ export const handleConnection = async (socket: Socket) => {
 
       return;
     } else {
-      socket.disconnect();
+      socket.emit('username-taken');
       return;
     }
   } catch (error) {

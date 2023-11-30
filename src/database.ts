@@ -93,12 +93,12 @@ export const getRoom = (id: string): Promise<Room> => {
   });
 };
 
-export const isUserInRoom = ({
+export const isUsernameTaken = ({
   roomId,
-  user,
+  username,
 }: {
   roomId: string;
-  user: User;
+  username: string;
 }): Promise<boolean> => {
   return new Promise<boolean>((resolve, reject) => {
     const sql = 'SELECT users FROM rooms WHERE id = ?';
@@ -112,7 +112,7 @@ export const isUserInRoom = ({
 
       const users: User[] = JSON.parse(row.users);
       const foundUser: User | undefined = users.find(
-        (u: User) => u.username === user.username,
+        (u: User) => u.username === username,
       );
 
       if (foundUser !== undefined) {

@@ -33,7 +33,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.get('/:id/isUsernameAvailable', async (req, res) => {
+router.get('/:id/isUsernameTaken', async (req, res) => {
   const roomId = req.params.id;
   const username = req.query.username as string;
 
@@ -41,11 +41,9 @@ router.get('/:id/isUsernameAvailable', async (req, res) => {
     const room = await getRoom(roomId);
 
     if (room) {
-      const isAvailable = !room.users.find(
-        (user) => user.username === username,
-      );
+      const isTaken = room.users.find((user) => user.username === username);
 
-      res.status(200).send({ isAvailable });
+      res.status(200).send({ isTaken });
       return;
     } else {
       res.status(404).send('Room not found');
