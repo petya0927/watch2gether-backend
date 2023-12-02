@@ -42,9 +42,14 @@ export const handleConnection = async (socket: Socket) => {
 
       socket.join(query.id as string);
 
+      emitRoomData(socket);
+
+      emitUserJoined(socket);
+
       return;
     } else {
       socket.emit('username-taken');
+      socket.disconnect();
       return;
     }
   } catch (error) {

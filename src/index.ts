@@ -29,10 +29,6 @@ app.use('/room', roomRouter);
 io.on('connection', async (socket) => {
   await handleConnection(socket);
 
-  emitRoomData(socket);
-
-  emitUserJoined(socket);
-
   socket.on('video-play', (data) => {
     emitVideoPlay({ socket, data });
   });

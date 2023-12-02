@@ -116,7 +116,7 @@ export const isUsernameTaken = ({
       );
 
       if (foundUser !== undefined) {
-        console.log(`User ${foundUser.username} is already in room ${roomId}.`);
+        console.log(`Username ${username} is taken in room ${roomId}.`);
       }
 
       resolve(foundUser !== undefined);
