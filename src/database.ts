@@ -5,7 +5,7 @@ import { uid } from 'uid';
 import { fileURLToPath } from 'url';
 import { Room, RoomDatabase, User } from './types.js';
 
-let db: sqlite3.Database;
+var db: sqlite3.Database | undefined = undefined;
 
 const createDatabaseFile = () => {
   const __filename = fileURLToPath(import.meta.url);
@@ -15,7 +15,7 @@ const createDatabaseFile = () => {
 
   if (!fs.existsSync(dbDir)) {
     const err = fs.mkdirSync(dbDir, { recursive: true });
-    if (err) {
+    if (err === undefined) {
       console.error(err);
       return undefined;
     }
@@ -65,6 +65,8 @@ export const createRoom = ({
   videoUrl: string;
   owner: string;
 }): Promise<string | Error> => {
+  init();
+
   return new Promise((resolve, reject) => {
     let id = uid(16);
     let sql =
@@ -72,19 +74,23 @@ export const createRoom = ({
 
     const users = JSON.stringify([]);
 
-    db.run(sql, [id, videoUrl, owner, users], (err) => {
-      if (err) {
-        console.error(err.message);
-        reject(err);
-        return;
-      }
+    if (db) {
+      db.run(sql, [id, videoUrl, owner, users], (err) => {
+        if (err) {
+          console.error(err.message);
+          reject(err);
+          return;
+        }
 
-      console.log(
-        `Created room with id ${id}, videoUrl ${videoUrl}, owner ${owner}.`,
-      );
+        console.log(
+          `Created room with id ${id}, videoUrl ${videoUrl}, owner ${owner}.`,
+        );
 
-      resolve(id);
-    });
+        resolve(id);
+      });
+    } else {
+      reject(new Error('Database not initialized.'));
+    }
   });
 };
 
@@ -92,26 +98,30 @@ export const getRoom = (id: string): Promise<Room> => {
   return new Promise((resolve, reject) => {
     const sql = 'SELECT * FROM rooms WHERE id = ?';
 
-    db.get(sql, [id], (err, row: RoomDatabase) => {
-      if (err) {
-        console.error(err.message);
-        reject(err);
-        return;
-      }
+    if (db) {
+      db.get(sql, [id], (err, row: RoomDatabase) => {
+        if (err) {
+          console.error(err.message);
+          reject(err);
+          return;
+        }
 
-      if (!row) {
-        console.error(`Room ${id} not found.`);
-        reject(err);
-        return;
-      }
+        if (!row) {
+          console.error(`Room ${id} not found.`);
+          reject(err);
+          return;
+        }
 
-      const users: User[] = JSON.parse(row.users);
+        const users: User[] = JSON.parse(row.users);
 
-      resolve({
-        ...row,
-        users,
+        resolve({
+          ...row,
+          users,
+        });
       });
-    });
+    } else {
+      reject(new Error('Database not initialized.'));
+    }
   });
 };
 
@@ -125,24 +135,28 @@ export const isUsernameTaken = ({
   return new Promise<boolean>((resolve, reject) => {
     const sql = 'SELECT users FROM rooms WHERE id = ?';
 
-    db.get(sql, [roomId], (err, row: RoomDatabase) => {
-      if (err) {
-        console.error(err.message);
-        reject(err);
-        return undefined;
-      }
+    if (db) {
+      db.get(sql, [roomId], (err, row: RoomDatabase) => {
+        if (err) {
+          console.error(err.message);
+          reject(err);
+          return undefined;
+        }
 
-      const users: User[] = JSON.parse(row.users);
-      const foundUser: User | undefined = users.find(
-        (u: User) => u.username === username,
-      );
+        const users: User[] = JSON.parse(row.users);
+        const foundUser: User | undefined = users.find(
+          (u: User) => u.username === username,
+        );
 
-      if (foundUser !== undefined) {
-        console.log(`Username ${username} is taken in room ${roomId}.`);
-      }
+        if (foundUser !== undefined) {
+          console.log(`Username ${username} is taken in room ${roomId}.`);
+        }
 
-      resolve(foundUser !== undefined);
-    });
+        resolve(foundUser !== undefined);
+      });
+    } else {
+      reject(new Error('Database not initialized.'));
+    }
   });
 };
 
@@ -155,34 +169,39 @@ export const addUserToRoom = ({
 }): Promise<void> => {
   return new Promise((resolve, reject) => {
     const sql = 'SELECT users FROM rooms WHERE id = ?';
-
-    db.get(sql, [roomId], (err, row: RoomDatabase) => {
-      if (err) {
-        console.error(err.message);
-        reject(err);
-        return;
-      }
-
-      const users: User[] = JSON.parse(row.users);
-
-      users.push(user);
-
-      const updatedUsers = JSON.stringify(users);
-
-      const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
-
-      db.run(sql, [updatedUsers, roomId], (err) => {
+    if (db) {
+      db.get(sql, [roomId], (err, row: RoomDatabase) => {
         if (err) {
           console.error(err.message);
           reject(err);
           return;
         }
 
-        console.log(`Added user ${user.username} to room ${roomId}.`);
+        const users: User[] = JSON.parse(row.users);
 
-        resolve();
+        users.push(user);
+
+        const updatedUsers = JSON.stringify(users);
+
+        const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
+
+        if (db) {
+          db.run(sql, [updatedUsers, roomId], (err) => {
+            if (err) {
+              console.error(err.message);
+              reject(err);
+              return;
+            }
+
+            console.log(`Added user ${user.username} to room ${roomId}.`);
+
+            resolve();
+          });
+        }
       });
-    });
+    } else {
+      reject(new Error('Database not initialized.'));
+    }
   });
 };
 
@@ -196,32 +215,38 @@ export const removeUserFromRoom = ({
   return new Promise((resolve, reject) => {
     const sql = 'SELECT users FROM rooms WHERE id = ?';
 
-    db.get(sql, [roomId], (err, row: RoomDatabase) => {
-      if (err) {
-        console.error(err.message);
-        reject(err);
-        return;
-      }
-
-      const users = JSON.parse(row.users);
-
-      const updatedUsers = users.filter(
-        (u: User) => u.socketId !== user.socketId,
-      );
-
-      const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
-
-      db.run(sql, [JSON.stringify(updatedUsers), roomId], (err) => {
+    if (db) {
+      db.get(sql, [roomId], (err, row: RoomDatabase) => {
         if (err) {
           console.error(err.message);
           reject(err);
           return;
         }
 
-        console.log(`Removed user ${user.username} from room ${roomId}.`);
+        const users = JSON.parse(row.users);
 
-        resolve();
+        const updatedUsers = users.filter(
+          (u: User) => u.socketId !== user.socketId,
+        );
+
+        const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
+
+        if (db) {
+          db.run(sql, [JSON.stringify(updatedUsers), roomId], (err) => {
+            if (err) {
+              console.error(err.message);
+              reject(err);
+              return;
+            }
+
+            console.log(`Removed user ${user.username} from room ${roomId}.`);
+
+            resolve();
+          });
+        }
       });
-    });
+    } else {
+      reject(new Error('Database not initialized.'));
+    }
   });
 };
