@@ -1,16 +1,38 @@
 import fs from 'fs';
+import path, { dirname } from 'path';
 import sqlite3 from 'sqlite3';
 import { uid } from 'uid';
+import { fileURLToPath } from 'url';
 import { Room, RoomDatabase, User } from './types.js';
 
 let db: sqlite3.Database;
 
-const init = () => {
-  const dbPath = './database/database.db';
+const createDatabaseFile = () => {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = dirname(__filename);
+  const dbDir = path.join(__dirname, './database');
+  const dbPath = path.join(dbDir, 'database.db');
+
+  if (!fs.existsSync(dbDir)) {
+    const err = fs.mkdirSync(dbDir, { recursive: true });
+    if (err) {
+      console.error(err);
+      return undefined;
+    }
+  }
 
   if (!fs.existsSync(dbPath)) {
     fs.writeFileSync(dbPath, '');
     console.log('Created database file.');
+  }
+
+  return dbPath;
+};
+
+const init = () => {
+  const dbPath = createDatabaseFile();
+  if (!dbPath) {
+    return;
   }
 
   db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE, (err) => {
