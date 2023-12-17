@@ -7,6 +7,11 @@ router.post('/new', async (req, res) => {
   const videoUrl = req.body.videoUrl;
   const owner = req.body.owner;
 
+  if (!videoUrl || !owner) {
+    res.status(400).send('Missing videoUrl or owner');
+    return;
+  }
+
   const id = await createRoom({ videoUrl, owner });
 
   if (id) {

@@ -65,8 +65,6 @@ export const createRoom = ({
   videoUrl: string;
   owner: string;
 }): Promise<string | Error> => {
-  init();
-
   return new Promise((resolve, reject) => {
     let id = uid(16);
     let sql =
