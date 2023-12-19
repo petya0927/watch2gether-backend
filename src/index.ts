@@ -3,8 +3,6 @@ import express from 'express';
 import { createServer } from 'http';
 import roomRouter from './room.js';
 import {
-  emitRoomData,
-  emitUserJoined,
   emitUserLeft,
   emitVideoPause,
   emitVideoPlay,
