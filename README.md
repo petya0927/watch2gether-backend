@@ -5,7 +5,7 @@ A simple, minimalistic websockets and Next.js based webapplication, where you ca
 
 ## Demo
 
-We don't have a demo page yet, but it's coming soon!
+[Demo on Vercel](https://watch2gether-frontend.vercel.app/)
 
 ## Installation
 
