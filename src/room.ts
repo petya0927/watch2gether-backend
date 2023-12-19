@@ -4,28 +4,31 @@ import { createRoom, getRoom } from './database.js';
 const router = express.Router();
 
 router.post('/new', async (req, res) => {
-  const videoUrl = req.body.videoUrl;
-  const owner = req.body.owner;
+  try {
+    const videoUrl = req.body.videoUrl;
+    const owner = req.body.owner;
 
-  if (!videoUrl || !owner) {
-    res.status(400).send('Missing videoUrl or owner');
-    return;
+    if (!videoUrl || !owner) {
+      return res.status(400).json({ error: 'Missing videoUrl or owner' });
+    }
+
+    const id = await createRoom({ videoUrl, owner });
+
+    if (!id) {
+      return res.status(500).json({ error: 'Error creating room' });
+    }
+
+    return res.status(200).json({ id });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: 'An unexpected error occurred' });
   }
-
-  const id = await createRoom({ videoUrl, owner });
-
-  if (id) {
-    res.status(200).send({ id });
-    return;
-  }
-
-  res.status(500).send('Error creating room');
 });
 
 router.get('/:id', async (req, res) => {
-  const roomId = req.params.id;
-
   try {
+    const roomId = req.params.id;
+
     const room = await getRoom(roomId);
 
     if (room) {
@@ -39,10 +42,10 @@ router.get('/:id', async (req, res) => {
 });
 
 router.get('/:id/isUsernameTaken', async (req, res) => {
-  const roomId = req.params.id;
-  const username = req.query.username as string;
-
   try {
+    const roomId = req.params.id;
+    const username = req.query.username as string;
+
     const room = await getRoom(roomId);
 
     if (room) {

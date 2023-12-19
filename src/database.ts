@@ -29,31 +29,81 @@ const createDatabaseFile = () => {
   return dbPath;
 };
 
-const init = () => {
-  const dbPath = createDatabaseFile();
-  if (!dbPath) {
-    return;
+const createRoomsTable = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    let sql =
+      'CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY, videoUrl TEXT, owner TEXT, users TEXT, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP)';
+
+    if (db) {
+      db.run(sql, (err) => {
+        if (err) {
+          console.error(err.message);
+          reject(err);
+          return;
+        }
+        console.log('Created rooms table.');
+        resolve();
+      });
+    } else {
+      reject(new Error('Database not initialized.'));
+    }
+  });
+};
+
+const connectToDatabase = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const dbPath = createDatabaseFile();
+    if (!dbPath) {
+      reject(new Error('Database path not found.'));
+      return;
+    }
+
+    db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE, (err) => {
+      if (err) {
+        console.error(err.message);
+        reject(err);
+        return;
+      }
+
+      console.log('Connected to the database.');
+      resolve();
+    });
+  });
+};
+
+export const kickAllUsers = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const sql = 'UPDATE rooms SET users = ?';
+
+    if (db) {
+      db.run(sql, [JSON.stringify([])], (err) => {
+        if (err) {
+          console.error(err.message);
+          reject(err);
+          return;
+        }
+
+        console.log(`Kicked all users due to server restart.`);
+
+        resolve();
+      });
+    } else {
+      reject(new Error('Database not initialized.'));
+    }
+  });
+};
+
+const init = async () => {
+  try {
+    await connectToDatabase();
+
+    await createRoomsTable();
+
+    await kickAllUsers();
+  } catch (error) {
+    console.error('Failed to connect to the database', error);
+    throw error;
   }
-
-  db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE, (err) => {
-    if (err) {
-      console.error(err.message);
-      return;
-    }
-
-    console.log('Connected to the database.');
-  });
-
-  let sql =
-    'CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY, videoUrl TEXT, owner TEXT, users TEXT, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP)';
-
-  db.run(sql, (err) => {
-    if (err) {
-      console.error(err.message);
-      return;
-    }
-    console.log('Created rooms table.');
-  });
 };
 
 init();
@@ -141,6 +191,12 @@ export const isUsernameTaken = ({
           return undefined;
         }
 
+        if (!row) {
+          console.error(`Room ${roomId} not found.`);
+          reject(err);
+          return undefined;
+        }
+
         const users: User[] = JSON.parse(row.users);
         const foundUser: User | undefined = users.find(
           (u: User) => u.username === username,
@@ -171,6 +227,12 @@ export const addUserToRoom = ({
       db.get(sql, [roomId], (err, row: RoomDatabase) => {
         if (err) {
           console.error(err.message);
+          reject(err);
+          return;
+        }
+
+        if (!row) {
+          console.error(`Room ${roomId} not found.`);
           reject(err);
           return;
         }
@@ -217,6 +279,12 @@ export const removeUserFromRoom = ({
       db.get(sql, [roomId], (err, row: RoomDatabase) => {
         if (err) {
           console.error(err.message);
+          reject(err);
+          return;
+        }
+
+        if (!row) {
+          console.error(`Room ${roomId} not found.`);
           reject(err);
           return;
         }
