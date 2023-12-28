@@ -5,6 +5,7 @@ import {
   isUsernameTaken,
   removeUserFromRoom,
 } from './database.js';
+import { logErrorToConsole } from './helperFunctions.js';
 
 let io: Server;
 
@@ -22,12 +23,11 @@ export const handleConnection = async (socket: Socket) => {
   const query = socket.handshake.query;
 
   try {
-    if (
-      !(await isUsernameTaken({
-        roomId: query.id as string,
-        username: query.username as string,
-      }))
-    ) {
+    const isTaken = await isUsernameTaken({
+      roomId: query.id as string,
+      username: query.username as string,
+    });
+    if (!isTaken) {
       console.log(
         `User ${query.username} connected to room ${query.id} with socket id ${socket.id}`,
       );
@@ -53,21 +53,20 @@ export const handleConnection = async (socket: Socket) => {
       return;
     }
   } catch (error) {
-    console.error(`Failed to add user to room: ${error}`);
+    logErrorToConsole({ error, func: 'handleConnection' });
     socket.disconnect();
     return;
   }
 };
 
 export const emitRoomData = async (socket: Socket) => {
-  const query = socket.handshake.query;
-
   try {
+    const query = socket.handshake.query;
     const room = await getRoom(query.id as string);
     socket.emit('room-data', room);
     return;
   } catch (error) {
-    console.error(`Failed to get room data: ${error}`);
+    logErrorToConsole({ error, func: 'emitRoomData' });
     socket.disconnect();
     return;
   }
@@ -107,7 +106,7 @@ export const handleDisconnect = async (socket: Socket) => {
       `User ${query.username} disconnected from room ${query.id} with socket id ${socket.id}`,
     );
   } catch (error) {
-    console.error(`Failed to remove user from room: ${error}`);
+    logErrorToConsole({ error, func: 'handleDisconnect' });
     socket.disconnect();
     return;
   }

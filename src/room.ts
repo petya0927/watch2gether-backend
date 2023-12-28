@@ -1,5 +1,6 @@
 import express from 'express';
-import { createRoom, getRoom } from './database.js';
+import { createRoom, getRoom, isUsernameTaken } from './database.js';
+import { logErrorToConsole } from './helperFunctions.js';
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.post('/new', async (req, res) => {
 
     return res.status(200).json({ id });
   } catch (error) {
-    console.error(error);
+    logErrorToConsole({ error, func: '/new' });
     return res.status(500).json({ error: 'An unexpected error occurred' });
   }
 });
@@ -34,9 +35,12 @@ router.get('/:id', async (req, res) => {
     if (room) {
       res.status(200).send({ room });
       return;
+    } else {
+      res.status(404).send('Room not found');
+      return;
     }
   } catch (error) {
-    console.error(`Failed to get room: ${error}`);
+    logErrorToConsole({ error, func: '/:id' });
     res.status(404).send('Room not found');
   }
 });
@@ -46,19 +50,11 @@ router.get('/:id/isUsernameTaken', async (req, res) => {
     const roomId = req.params.id;
     const username = req.query.username as string;
 
-    const room = await getRoom(roomId);
+    const isTaken = await isUsernameTaken({ roomId, username });
 
-    if (room) {
-      const isTaken = room.users.find((user) => user.username === username);
-
-      res.status(200).send({ isTaken });
-      return;
-    } else {
-      res.status(404).send('Room not found');
-      return;
-    }
+    res.status(200).send({ isTaken });
   } catch (error) {
-    console.error(`Failed to check username availability: ${error}`);
+    logErrorToConsole({ error, func: '/:id/isUsernameTaken' });
     res.status(404).send('Room not found');
   }
 });

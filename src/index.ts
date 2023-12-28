@@ -11,6 +11,8 @@ import {
   handleDisconnect,
   initSocket,
 } from './socket.js';
+import { init } from './database.js';
+import { logErrorToConsole } from './helperFunctions.js';
 
 const port = 8081 || process.env.PORT;
 
@@ -22,8 +24,10 @@ const io = initSocket(server);
 app.use(express.json());
 app.use(cors());
 
+// routes
 app.use('/room', roomRouter);
 
+// socket
 io.on('connection', async (socket) => {
   await handleConnection(socket);
 
@@ -45,6 +49,16 @@ io.on('connection', async (socket) => {
   });
 });
 
-server.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
-});
+const startServer = async () => {
+  try {
+    await init();
+
+    server.listen(port, () => {
+      console.log(`Server listening on port ${port} 🚀`);
+    });
+  } catch (error) {
+    logErrorToConsole({ error, func: 'startServer' });
+  }
+};
+
+startServer();
