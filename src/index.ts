@@ -12,7 +12,7 @@ import {
   initSocket,
 } from './socket.js';
 import { init } from './database.js';
-import { logErrorToConsole } from './helperFunctions.js';
+import { log, logErrorToConsole } from './helperFunctions.js';
 
 const port = 8081 || process.env.PORT;
 
@@ -54,7 +54,10 @@ const startServer = async () => {
     await init();
 
     server.listen(port, () => {
-      console.log(`Server listening on port ${port} 🚀`);
+      log({
+        message: `Server listening on port ${port}! 🚀`,
+        level: 'success',
+      });
     });
   } catch (error) {
     logErrorToConsole({ error, func: 'startServer' });

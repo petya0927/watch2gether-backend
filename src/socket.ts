@@ -5,7 +5,7 @@ import {
   isUsernameTaken,
   removeUserFromRoom,
 } from './database.js';
-import { logErrorToConsole } from './helperFunctions.js';
+import { log, logErrorToConsole } from './helperFunctions.js';
 
 let io: Server;
 
@@ -28,9 +28,9 @@ export const handleConnection = async (socket: Socket) => {
       username: query.username as string,
     });
     if (!isTaken) {
-      console.log(
-        `User ${query.username} connected to room ${query.id} with socket id ${socket.id}`,
-      );
+      log({
+        message: `User ${query.username} connected to room ${query.id} with socket id ${socket.id}`,
+      });
 
       await addUserToRoom({
         roomId: query.id as string,
@@ -102,9 +102,9 @@ export const handleDisconnect = async (socket: Socket) => {
       },
     });
 
-    console.log(
-      `User ${query.username} disconnected from room ${query.id} with socket id ${socket.id}`,
-    );
+    log({
+      message: `User ${query.username} disconnected from room ${query.id} with socket id ${socket.id}`,
+    });
   } catch (error) {
     logErrorToConsole({ error, func: 'handleDisconnect' });
     socket.disconnect();
