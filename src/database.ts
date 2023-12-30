@@ -7,7 +7,7 @@ import {
   ServerApiVersion,
 } from 'mongodb';
 import { log } from './helperFunctions.js';
-import { Room, User } from './types.js';
+import { Message, Room, User } from './types.js';
 
 let client: MongoClient | null = null;
 
@@ -69,6 +69,7 @@ export const createRoom = async ({
     videoUrl,
     owner,
     users: [],
+    messages: [],
     createdAt: new Date().toISOString(),
   });
 
@@ -114,20 +115,19 @@ export const addUserToRoom = async ({
 }: {
   roomId: string;
   user: User;
-}): Promise<boolean> => {
+}) => {
   const result = await roomsCollection?.updateOne(
     { _id: new ObjectId(roomId) },
     { $push: { users: user } },
   );
 
-  if (result?.modifiedCount === 1) {
-    log({
-      message: `Added user ${user.username} to room ${roomId}.`,
-    });
-    return true;
-  } else {
+  if (result?.modifiedCount !== 1) {
     throw new Error(`Failed to add user ${user.username} to room ${roomId}.`);
   }
+
+  log({
+    message: `Added user ${user.username} to room ${roomId}.`,
+  });
 };
 
 export const removeUserFromRoom = async ({
@@ -136,20 +136,39 @@ export const removeUserFromRoom = async ({
 }: {
   roomId: string;
   user: User;
-}): Promise<boolean> => {
+}) => {
   const result = await roomsCollection?.updateOne(
     { _id: new ObjectId(roomId) },
     { $pull: { users: user } },
   );
 
-  if (result?.modifiedCount === 1) {
-    log({
-      message: `Removed user ${user.username} from room ${roomId}.`,
-    });
-    return true;
-  } else {
+  if (result?.modifiedCount !== 1) {
     throw new Error(
       `Failed to remove user ${user.username} from room ${roomId}.`,
     );
   }
+  log({
+    message: `Removed user ${user.username} from room ${roomId}.`,
+  });
+};
+
+export const addMessageToRoom = async ({
+  roomId,
+  message,
+}: {
+  roomId: string;
+  message: Message;
+}) => {
+  const result = await roomsCollection?.updateOne(
+    { _id: new ObjectId(roomId) },
+    { $push: { messages: message } },
+  );
+
+  if (result?.modifiedCount !== 1) {
+    throw new Error(`Failed to add message to room ${roomId}.`);
+  }
+
+  log({
+    message: `New message in room ${roomId} from ${message.username}: ${message.message}`,
+  });
 };

@@ -3,6 +3,7 @@ import express from 'express';
 import { createServer } from 'http';
 import roomRouter from './room.js';
 import {
+  emitMessage,
   emitUserLeft,
   emitVideoPause,
   emitVideoPlay,
@@ -36,11 +37,15 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('video-pause', () => {
-    emitVideoPause({ socket });
+    emitVideoPause(socket);
   });
 
   socket.on('video-playback-rate-change', (data) => {
     emitVideoPlaybackRateChange({ socket, data });
+  });
+
+  socket.on('message', (data) => {
+    emitMessage({ socket, data });
   });
 
   socket.on('disconnect', async () => {

@@ -1,11 +1,13 @@
 import { Server, Socket } from 'socket.io';
 import {
+  addMessageToRoom,
   addUserToRoom,
   getRoom,
   isUsernameTaken,
   removeUserFromRoom,
 } from './database.js';
 import { log, logErrorToConsole } from './helperFunctions.js';
+import { Message } from './types.js';
 
 let io: Server;
 
@@ -123,7 +125,7 @@ export const emitVideoPlay = ({
   socket.to(query.id as string).emit('video-play', data);
 };
 
-export const emitVideoPause = ({ socket }: { socket: Socket }) => {
+export const emitVideoPause = (socket: Socket) => {
   const query = socket.handshake.query;
   socket.to(query.id as string).emit('video-pause');
 };
@@ -137,4 +139,27 @@ export const emitVideoPlaybackRateChange = ({
 }) => {
   const query = socket.handshake.query;
   socket.to(query.id as string).emit('video-playback-rate-change', data);
+};
+
+export const emitMessage = async ({
+  socket,
+  data,
+}: {
+  socket: Socket;
+  data: Message;
+}) => {
+  try {
+    const query = socket.handshake.query;
+
+    await addMessageToRoom({
+      roomId: query.id as string,
+      message: data,
+    });
+
+    socket.to(query.id as string).emit('message', data);
+  } catch (error) {
+    logErrorToConsole({ error, func: 'emitMessage' });
+    socket.disconnect();
+    return;
+  }
 };
