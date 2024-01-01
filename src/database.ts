@@ -41,14 +41,14 @@ export const kickAllUsers = async () => {
     { $set: { users: [] } },
   );
 
-  if (result?.matchedCount) {
-    log({
-      message: `Kicked ${result.modifiedCount} users from ${result.matchedCount} rooms.`,
-      level: 'success',
-    });
-  } else {
+  if (!result?.acknowledged) {
     throw new Error('Failed to kick users.');
   }
+
+  log({
+    message: `Kicked ${result.modifiedCount} users from ${result.matchedCount} rooms.`,
+    level: 'success',
+  });
 };
 
 export const init = async () => {
