@@ -1,20 +1,22 @@
-export interface RoomDatabase {
-  id: string;
-  videoUrl: string;
-  owner: string;
-  users: string;
-  createdAt: string;
-}
+import { ObjectId } from 'mongodb';
 
 export interface Room {
-  id: string;
+  _id: ObjectId;
   videoUrl: string;
   owner: string;
   users: User[];
+  messages: Message[];
   createdAt: string;
 }
 
 export interface User {
   username: string;
   socketId: string;
+}
+
+export interface Message {
+  id: string;
+  username: string;
+  message: string;
+  createdAt: string;
 }

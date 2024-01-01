@@ -1,318 +1,173 @@
-import fs from 'fs';
-import path, { dirname } from 'path';
-import sqlite3 from 'sqlite3';
-import { uid } from 'uid';
-import { fileURLToPath } from 'url';
-import { Room, RoomDatabase, User } from './types.js';
+import 'dotenv/config';
+import {
+  Collection,
+  Db,
+  MongoClient,
+  ObjectId,
+  ServerApiVersion,
+} from 'mongodb';
+import { log } from './helperFunctions.js';
+import { Message, Room, User } from './types.js';
 
-var db: sqlite3.Database | undefined = undefined;
+let client: MongoClient | null = null;
+let db: Db | null = null;
+let roomsCollection: Collection | null = null;
 
-const createDatabaseFile = () => {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  const dbDir = path.join(__dirname, './database');
-  const dbPath = path.join(dbDir, 'database.db');
+const connectToDatabase = async (): Promise<MongoClient> => {
+  log({ message: 'Connecting to database server... 📡' });
 
-  if (!fs.existsSync(dbDir)) {
-    const err = fs.mkdirSync(dbDir, { recursive: true });
-    if (err === undefined) {
-      console.error(err);
-      return undefined;
-    }
-  }
-
-  if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, '');
-    console.log('Created database file.');
-  }
-
-  return dbPath;
-};
-
-const createRoomsTable = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    let sql =
-      'CREATE TABLE IF NOT EXISTS rooms(id TEXT PRIMARY KEY, videoUrl TEXT, owner TEXT, users TEXT, createdAt DATETIME DEFAULT CURRENT_TIMESTAMP)';
-
-    if (db) {
-      db.run(sql, (err) => {
-        if (err) {
-          console.error(err.message);
-          reject(err);
-          return;
-        }
-        console.log('Created rooms table.');
-        resolve();
-      });
-    } else {
-      reject(new Error('Database not initialized.'));
-    }
+  client = new MongoClient(process.env.MONGODB_URI as string, {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    },
   });
+
+  await client.connect();
+
+  db = client.db(process.env.MONGODB_DBNAME);
+  roomsCollection = db.collection('rooms');
+
+  log({ message: 'Connected to database server! 🎉', level: 'success' });
+  return client;
 };
 
-const connectToDatabase = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const dbPath = createDatabaseFile();
-    if (!dbPath) {
-      reject(new Error('Database path not found.'));
-      return;
-    }
+export const kickAllUsers = async () => {
+  const result = await roomsCollection?.updateMany(
+    {
+      users: { $exists: true },
+    },
+    { $set: { users: [] } },
+  );
 
-    db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE, (err) => {
-      if (err) {
-        console.error(err.message);
-        reject(err);
-        return;
-      }
-
-      console.log('Connected to the database.');
-      resolve();
+  if (result?.matchedCount) {
+    log({
+      message: `Kicked ${result.modifiedCount} users from ${result.matchedCount} rooms.`,
+      level: 'success',
     });
-  });
-};
-
-export const kickAllUsers = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const sql = 'UPDATE rooms SET users = ?';
-
-    if (db) {
-      db.run(sql, [JSON.stringify([])], (err) => {
-        if (err) {
-          console.error(err.message);
-          reject(err);
-          return;
-        }
-
-        console.log(`Kicked all users due to server restart.`);
-
-        resolve();
-      });
-    } else {
-      reject(new Error('Database not initialized.'));
-    }
-  });
-};
-
-const init = async () => {
-  try {
-    await connectToDatabase();
-
-    await createRoomsTable();
-
-    await kickAllUsers();
-  } catch (error) {
-    console.error('Failed to connect to the database', error);
-    throw error;
+  } else {
+    throw new Error('Failed to kick users.');
   }
 };
 
-init();
+export const init = async () => {
+  await connectToDatabase();
 
-export const createRoom = ({
+  await kickAllUsers();
+};
+
+export const createRoom = async ({
   videoUrl,
   owner,
 }: {
   videoUrl: string;
   owner: string;
-}): Promise<string | Error> => {
-  return new Promise((resolve, reject) => {
-    let id = uid(16);
-    let sql =
-      'INSERT INTO rooms(id, videoUrl, owner, users) VALUES(?, ?, ?, ?)';
-
-    const users = JSON.stringify([]);
-
-    if (db) {
-      db.run(sql, [id, videoUrl, owner, users], (err) => {
-        if (err) {
-          console.error(err.message);
-          reject(err);
-          return;
-        }
-
-        console.log(
-          `Created room with id ${id}, videoUrl ${videoUrl}, owner ${owner}.`,
-        );
-
-        resolve(id);
-      });
-    } else {
-      reject(new Error('Database not initialized.'));
-    }
+}): Promise<string> => {
+  const result = await roomsCollection?.insertOne({
+    videoUrl,
+    owner,
+    users: [],
+    messages: [],
+    createdAt: new Date().toISOString(),
   });
+
+  if (result?.insertedId) {
+    log({
+      message: `Created room with id ${result.insertedId}, videoUrl ${videoUrl}, owner ${owner}.`,
+    });
+
+    return result.insertedId.toString();
+  } else {
+    throw new Error(`Failed to create room (${videoUrl}, ${owner}).`);
+  }
 };
 
-export const getRoom = (id: string): Promise<Room> => {
-  return new Promise((resolve, reject) => {
-    const sql = 'SELECT * FROM rooms WHERE id = ?';
+export const getRoom = async (id: string): Promise<Room> => {
+  const objectId = new ObjectId(id);
+  const room = await roomsCollection?.findOne<Room>({ _id: objectId });
 
-    if (db) {
-      db.get(sql, [id], (err, row: RoomDatabase) => {
-        if (err) {
-          console.error(err.message);
-          reject(err);
-          return;
-        }
+  if (!room) {
+    throw new Error(`Room ${id} not found.`);
+  }
 
-        if (!row) {
-          console.error(`Room ${id} not found.`);
-          reject(err);
-          return;
-        }
-
-        const users: User[] = JSON.parse(row.users);
-
-        resolve({
-          ...row,
-          users,
-        });
-      });
-    } else {
-      reject(new Error('Database not initialized.'));
-    }
-  });
+  return room;
 };
 
-export const isUsernameTaken = ({
+export const isUsernameTaken = async ({
   roomId,
   username,
 }: {
   roomId: string;
   username: string;
 }): Promise<boolean> => {
-  return new Promise<boolean>((resolve, reject) => {
-    const sql = 'SELECT users FROM rooms WHERE id = ?';
+  const room = await getRoom(roomId);
 
-    if (db) {
-      db.get(sql, [roomId], (err, row: RoomDatabase) => {
-        if (err) {
-          console.error(err.message);
-          reject(err);
-          return undefined;
-        }
+  const isTaken = room.users.find((user) => user.username === username);
 
-        if (!row) {
-          console.error(`Room ${roomId} not found.`);
-          reject(err);
-          return undefined;
-        }
-
-        const users: User[] = JSON.parse(row.users);
-        const foundUser: User | undefined = users.find(
-          (u: User) => u.username === username,
-        );
-
-        if (foundUser !== undefined) {
-          console.log(`Username ${username} is taken in room ${roomId}.`);
-        }
-
-        resolve(foundUser !== undefined);
-      });
-    } else {
-      reject(new Error('Database not initialized.'));
-    }
-  });
+  return !!isTaken;
 };
 
-export const addUserToRoom = ({
+export const addUserToRoom = async ({
   roomId,
   user,
 }: {
   roomId: string;
   user: User;
-}): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const sql = 'SELECT users FROM rooms WHERE id = ?';
-    if (db) {
-      db.get(sql, [roomId], (err, row: RoomDatabase) => {
-        if (err) {
-          console.error(err.message);
-          reject(err);
-          return;
-        }
+}) => {
+  const result = await roomsCollection?.updateOne(
+    { _id: new ObjectId(roomId) },
+    { $push: { users: user } },
+  );
 
-        if (!row) {
-          console.error(`Room ${roomId} not found.`);
-          reject(err);
-          return;
-        }
+  if (result?.modifiedCount !== 1) {
+    throw new Error(`Failed to add user ${user.username} to room ${roomId}.`);
+  }
 
-        const users: User[] = JSON.parse(row.users);
-
-        users.push(user);
-
-        const updatedUsers = JSON.stringify(users);
-
-        const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
-
-        if (db) {
-          db.run(sql, [updatedUsers, roomId], (err) => {
-            if (err) {
-              console.error(err.message);
-              reject(err);
-              return;
-            }
-
-            console.log(`Added user ${user.username} to room ${roomId}.`);
-
-            resolve();
-          });
-        }
-      });
-    } else {
-      reject(new Error('Database not initialized.'));
-    }
+  log({
+    message: `Added user ${user.username} to room ${roomId}.`,
   });
 };
 
-export const removeUserFromRoom = ({
+export const removeUserFromRoom = async ({
   roomId,
   user,
 }: {
   roomId: string;
   user: User;
-}): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const sql = 'SELECT users FROM rooms WHERE id = ?';
+}) => {
+  const result = await roomsCollection?.updateOne(
+    { _id: new ObjectId(roomId) },
+    { $pull: { users: user } },
+  );
 
-    if (db) {
-      db.get(sql, [roomId], (err, row: RoomDatabase) => {
-        if (err) {
-          console.error(err.message);
-          reject(err);
-          return;
-        }
+  if (result?.modifiedCount !== 1) {
+    throw new Error(
+      `Failed to remove user ${user.username} from room ${roomId}.`,
+    );
+  }
+  log({
+    message: `Removed user ${user.username} from room ${roomId}.`,
+  });
+};
 
-        if (!row) {
-          console.error(`Room ${roomId} not found.`);
-          reject(err);
-          return;
-        }
+export const addMessageToRoom = async ({
+  roomId,
+  message,
+}: {
+  roomId: string;
+  message: Message;
+}) => {
+  const result = await roomsCollection?.updateOne(
+    { _id: new ObjectId(roomId) },
+    { $push: { messages: message } },
+  );
 
-        const users = JSON.parse(row.users);
+  if (result?.modifiedCount !== 1) {
+    throw new Error(`Failed to add message to room ${roomId}.`);
+  }
 
-        const updatedUsers = users.filter(
-          (u: User) => u.socketId !== user.socketId,
-        );
-
-        const sql = 'UPDATE rooms SET users = ? WHERE id = ?';
-
-        if (db) {
-          db.run(sql, [JSON.stringify(updatedUsers), roomId], (err) => {
-            if (err) {
-              console.error(err.message);
-              reject(err);
-              return;
-            }
-
-            console.log(`Removed user ${user.username} from room ${roomId}.`);
-
-            resolve();
-          });
-        }
-      });
-    } else {
-      reject(new Error('Database not initialized.'));
-    }
+  log({
+    message: `New message in room ${roomId} from ${message.username}: ${message.message}`,
   });
 };
