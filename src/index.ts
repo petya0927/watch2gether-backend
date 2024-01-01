@@ -25,7 +25,7 @@ const io = initSocket(server);
 app.use(express.json());
 
 const allowedOrigins = [
-  /^localhost(:\d+)?$/,
+  /localhost(:\d+)?$/,
   'http://watch2gether-frontend.vercel.app',
   /^https?:\/\/watch2gether-frontend-git-([a-zA-Z0-9_-]+)-petya0927\.vercel\.app$/,
   /^https?:\/\/watch2gether-frontend-([a-zA-Z0-9]{9})-petya0927\.vercel\.app$/,
