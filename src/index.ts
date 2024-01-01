@@ -23,7 +23,36 @@ const io = initSocket(server);
 
 // config
 app.use(express.json());
-app.use(cors());
+
+const allowedOrigins = [
+  /^localhost(:\d+)?$/,
+  'http://watch2gether-frontend.vercel.app',
+  /^https?:\/\/watch2gether-frontend-git-([a-zA-Z0-9_-]+)-petya0927\.vercel\.app$/,
+  /^https?:\/\/watch2gether-frontend-([a-zA-Z0-9]{9})-petya0927\.vercel\.app$/,
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.some((allowedOrigin) => {
+          if (allowedOrigin instanceof RegExp) {
+            // If the allowedOrigin is a RegExp, use the test method
+            return allowedOrigin.test(origin);
+          } else {
+            // If the allowedOrigin is a string, use the strict equality operator
+            return allowedOrigin === origin;
+          }
+        })
+      ) {
+        return callback(null, true);
+      } else {
+        return callback(new Error('Not allowed by CORS'));
+      }
+    },
+  }),
+);
 
 // routes
 app.use('/room', roomRouter);
