@@ -10,7 +10,6 @@ import { log } from './helperFunctions.js';
 import { Message, Room, User } from './types.js';
 
 let client: MongoClient | null = null;
-
 let db: Db | null = null;
 let roomsCollection: Collection | null = null;
 
@@ -27,7 +26,7 @@ const connectToDatabase = async (): Promise<MongoClient> => {
 
   await client.connect();
 
-  db = client.db('test');
+  db = client.db(process.env.MONGODB_DBNAME);
   roomsCollection = db.collection('rooms');
 
   log({ message: 'Connected to database server! 🎉', level: 'success' });
