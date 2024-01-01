@@ -38,10 +38,8 @@ app.use(
       if (
         allowedOrigins.some((allowedOrigin) => {
           if (allowedOrigin instanceof RegExp) {
-            // If the allowedOrigin is a RegExp, use the test method
             return allowedOrigin.test(origin);
           } else {
-            // If the allowedOrigin is a string, use the strict equality operator
             return allowedOrigin === origin;
           }
         })
